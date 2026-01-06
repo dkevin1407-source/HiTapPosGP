@@ -4,12 +4,12 @@
 
 1. Log in to your Hostinger control panel
 2. Go to **Databases** → **MySQL Databases**
-3. Find your database: `u552823944_POSNodeJs`
+3. Find your database: `u552823944_u552823944_POS`
 4. Click on **phpMyAdmin** to open the database management interface
 
 ## Step 2: Import the Schema
 
-1. In phpMyAdmin, select your database (`u552823944_POSNodeJs`) from the left sidebar
+1. In phpMyAdmin, select your database (`u552823944_u552823944_POS`) from the left sidebar
 2. Click on the **SQL** tab at the top
 3. Open the `schema.sql` file from your project
 4. Copy the entire contents of `schema.sql`
@@ -41,8 +41,8 @@ Check that default data was inserted:
 
 ### If you get connection errors:
 - Verify database credentials in `db.js`:
-  - Database: `u552823944_POSNodeJs`
-  - User: `u552823944_PosNodeJs`
+  - Database: `u552823944_u552823944_POS`
+  - User: `u552823944_u552823944_POS`
   - Password: `dctXbb5@1407`
   - Host: `localhost`
 
@@ -55,7 +55,7 @@ This will tell you if the database connection is working.
 If you have SSH access:
 
 ```bash
-mysql -u u552823944_PosNodeJs -p u552823944_POSNodeJs < schema.sql
+mysql -u u552823944_u552823944_POS -p u552823944_u552823944_POS < schema.sql
 ```
 
 Enter password when prompted: `dctXbb5@1407`
