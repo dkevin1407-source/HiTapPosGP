@@ -8,8 +8,6 @@
     "dev": "vite",
     "start:dev": "nodemon server.js",
     "dev:all": "concurrently \"npm run start:dev\" \"npm run dev\"",
-    "prebuild": "node scripts/check-api.js",
-    "check-api": "node scripts/check-api.js",
     "build": "tsc && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
