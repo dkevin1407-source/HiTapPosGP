@@ -29,35 +29,46 @@ const App: React.FC = () => {
       try {
         setIsLoading(true);
         const response = await fetch(`${API_BASE_URL}/api/initial-data`);
+        const responseData = await response.json();
         
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(errorData.details || errorData.error || 'Failed to fetch data');
+          // Response contains error details
+          const errorMessage = responseData.details || responseData.error || responseData.message || 'Failed to fetch data';
+          const errorCode = responseData.code || 'UNKNOWN';
+          throw new Error(`${errorMessage} (Code: ${errorCode})`);
         }
         
-        const data = await response.json();
-        
         // Transform data to match frontend types
-        setCategories(data.categories || []);
-        setMenu(data.menu || []);
-        setTables(data.tables || []);
-        setOrders((data.orders || []).map((order: any) => ({
+        setCategories(responseData.categories || []);
+        setMenu(responseData.menu || []);
+        setTables(responseData.tables || []);
+        setOrders((responseData.orders || []).map((order: any) => ({
           ...order,
           createdAt: new Date(order.createdAt)
         })));
-        setServiceRequests((data.serviceRequests || []).map((req: any) => ({
+        setServiceRequests((responseData.serviceRequests || []).map((req: any) => ({
           ...req,
           timestamp: new Date(req.timestamp)
         })));
       } catch (error: any) {
         console.error('Failed to fetch initial data:', error);
-        const errorMessage = error.message || 'Failed to load data. Please refresh the page.';
-        setNotification(`⚠️ ${errorMessage}`);
         
-        // If it's a database error, show more helpful message
-        if (errorMessage.includes('tables not found') || errorMessage.includes('connection failed')) {
-          console.error('Database Error Details:', error);
+        // Extract error message
+        let errorMessage = 'Failed to load data';
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else {
+          errorMessage = error.toString() || 'Unknown error occurred';
         }
+        
+        setNotification(`⚠️ ${errorMessage}`);
+        console.error('Full error details:', {
+          message: error.message,
+          stack: error.stack,
+          error: error
+        });
       } finally {
         setIsLoading(false);
       }
