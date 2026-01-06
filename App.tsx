@@ -115,7 +115,7 @@ const App: React.FC = () => {
       const { orderId } = await parseJSONSafely(response);
       const createdOrder = { ...newOrder, id: orderId };
       
-      setOrders(prev => [...prev, createdOrder]);
+      setOrders((prev: Order[]) => [...prev, createdOrder]);
       
       // Refresh menu to get updated inventory
       const menuResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
@@ -238,7 +238,7 @@ const App: React.FC = () => {
       });
       
       if (!response.ok) {
-        let errorData = { error: 'Unknown error' };
+        let errorData: any = { error: 'Unknown error' };
         try { errorData = await parseJSONSafely(response); } catch(e) { /* keep fallback */ }
         throw new Error(errorData.error || errorData.details || 'Failed to add menu item');
       }
@@ -335,7 +335,7 @@ const App: React.FC = () => {
             categories={categories}
             serviceRequests={serviceRequests}
             orders={orders}
-            onResolveRequest={async (id) => {
+            onResolveRequest={async (id: number) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/service-requests/${id}`, {
                   method: 'DELETE'
@@ -357,7 +357,7 @@ const App: React.FC = () => {
             onSettleBill={handleSettleBill}
             onAddMenuItem={handleAddMenuItem}
             onUpdateMenuItem={handleUpdateMenuItem}
-            onDeleteMenuItem={async (id) => {
+            onDeleteMenuItem={async (id: number) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
                   method: 'DELETE'
@@ -372,7 +372,7 @@ const App: React.FC = () => {
                 setNotification('Failed to delete item. Please try again.');
               }
             }}
-            onAddCategory={async (cat) => {
+            onAddCategory={async (cat: { name: string; color?: string }) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/categories`, {
                   method: 'POST',
@@ -380,7 +380,7 @@ const App: React.FC = () => {
                   body: JSON.stringify({ name: cat.name, color: cat.color })
                 });
                 if (!response.ok) {
-                  let errorData = { error: 'Unknown error' };
+                  let errorData: any = { error: 'Unknown error' };
                   try { errorData = await parseJSONSafely(response); } catch(e) { /* keep fallback */ }
                   throw new Error(errorData.error || errorData.details || 'Failed to add category');
                 }
@@ -394,7 +394,7 @@ const App: React.FC = () => {
                 setNotification(`Failed to add category: ${error.message || 'Please try again.'}`);
               }
             }}
-            onAddTable={async (table) => {
+            onAddTable={async (table: { number: string; area: string; status?: string; token?: string }) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/tables`, {
                   method: 'POST',
@@ -407,7 +407,7 @@ const App: React.FC = () => {
                   })
                 });
                 if (!response.ok) {
-                  let errorData = { error: 'Unknown error' };
+                  let errorData: any = { error: 'Unknown error' };
                   try { errorData = await parseJSONSafely(response); } catch(e) { /* keep fallback */ }
                   throw new Error(errorData.error || errorData.details || 'Failed to add table');
                 }
@@ -421,7 +421,7 @@ const App: React.FC = () => {
                 setNotification(`Failed to add table: ${error.message || 'Please try again.'}`);
               }
             }}
-            onDeleteTable={async (id) => {
+            onDeleteTable={async (id: number) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/tables/${id}`, {
                   method: 'DELETE'
@@ -436,7 +436,7 @@ const App: React.FC = () => {
                 setNotification('Failed to delete table. Please try again.');
               }
             }}
-            onUpdateArea={async (old, newArea) => {
+            onUpdateArea={async (old: string, newArea: string) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/tables/area/update`, {
                   method: 'PUT',
@@ -453,7 +453,7 @@ const App: React.FC = () => {
                 setNotification('Failed to update area. Please try again.');
               }
             }}
-            onDeleteArea={async (area) => {
+            onDeleteArea={async (area: string) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/tables/area/${area}`, {
                   method: 'DELETE'
@@ -484,7 +484,7 @@ const App: React.FC = () => {
           <CustomerPortal 
             table={tables[0]} 
             menu={menu} 
-            currentOrder={orders.find(o => o.tableId === tables[0].id && o.status !== OrderStatus.Paid)}
+            currentOrder={orders.find((o: Order) => o.tableId === tables[0].id && o.status !== OrderStatus.Paid)}
             onRequestService={handleServiceRequest}
             onCreateOrder={handleCreateOrder}
           />
