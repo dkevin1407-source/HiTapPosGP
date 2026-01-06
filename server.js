@@ -47,11 +47,12 @@ app.post('/api/menu', async (req, res) => {
     try {
         const [result] = await pool.query(
             'INSERT INTO menu_items (categoryId, name, price, vegType, shortcut, inventoryCount) VALUES (?, ?, ?, ?, ?, ?)',
-            [categoryId, name, price, vegType, shortcut, inventoryCount]
+            [categoryId, name, price, vegType, shortcut || null, inventoryCount || 0]
         );
-        res.json({ id: result.insertId, ...req.body });
+        res.json({ id: result.insertId, categoryId, name, price, vegType, shortcut, inventoryCount, isAvailable: true });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to add menu item' });
+        console.error('Error adding menu item:', error);
+        res.status(500).json({ error: 'Failed to add menu item', details: error.message });
     }
 });
 
@@ -203,20 +204,25 @@ app.get('/api/categories', async (req, res) => {
         const [categories] = await pool.query('SELECT * FROM categories ORDER BY id');
         res.json(categories);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch categories' });
+        console.error('Error fetching categories:', error);
+        res.status(500).json({ error: 'Failed to fetch categories', details: error.message });
     }
 });
 
 app.post('/api/categories', async (req, res) => {
     const { name, color } = req.body;
     try {
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Category name is required' });
+        }
         const [result] = await pool.query(
             'INSERT INTO categories (name, color) VALUES (?, ?)',
-            [name, color]
+            [name.trim(), color || '#3b82f6']
         );
-        res.json({ id: result.insertId, name, color });
+        res.json({ id: result.insertId, name: name.trim(), color: color || '#3b82f6' });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to add category' });
+        console.error('Error adding category:', error);
+        res.status(500).json({ error: 'Failed to add category', details: error.message });
     }
 });
 
@@ -233,13 +239,26 @@ app.get('/api/tables', async (req, res) => {
 app.post('/api/tables', async (req, res) => {
     const { number, area, status, token } = req.body;
     try {
+        if (!number || !number.trim()) {
+            return res.status(400).json({ error: 'Table number is required' });
+        }
+        if (!area || !area.trim()) {
+            return res.status(400).json({ error: 'Table area is required' });
+        }
         const [result] = await pool.query(
             'INSERT INTO tables_pos (number, area, status, token) VALUES (?, ?, ?, ?)',
-            [number, area, status || 'Available', token || `token-${Date.now()}`]
+            [number.trim(), area.trim(), status || 'Available', token || `token-${Date.now()}`]
         );
-        res.json({ id: result.insertId, number, area, status: status || 'Available', token: token || `token-${Date.now()}` });
+        res.json({ 
+            id: result.insertId, 
+            number: number.trim(), 
+            area: area.trim(), 
+            status: status || 'Available', 
+            token: token || `token-${Date.now()}` 
+        });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to add table' });
+        console.error('Error adding table:', error);
+        res.status(500).json({ error: 'Failed to add table', details: error.message });
     }
 });
 
