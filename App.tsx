@@ -26,14 +26,21 @@ const App: React.FC = () => {
   const parseJSONSafely = async (response: Response) => {
     const contentType = response.headers.get('content-type') || '';
     const text = await response.text();
+    const snippet = text.replace(/\s+/g, ' ').slice(0, 300);
     if (contentType.includes('application/json')) {
       try {
         return JSON.parse(text);
       } catch (e) {
-        throw new Error(`Invalid JSON received from ${response.url}: ${text.slice(0,200)}`);
+        throw new Error(`Invalid JSON received from ${response.url} (status ${response.status}): ${snippet}`);
       }
     }
-    throw new Error(`Expected JSON but received: ${text.slice(0,200)}`);
+
+    // Helpful error message when HTML is returned instead of JSON
+    let advice = `This usually means your backend is not running or the API base URL is misconfigured (check VITE_API_BASE_URL).`;
+    if (response.status >= 400) {
+      advice += ` Server responded with status ${response.status}.`;
+    }
+    throw new Error(`Expected JSON from ${response.url} (status ${response.status}) but received HTML: ${snippet}. ${advice}`);
   };
 
   // Fetch initial data from API
@@ -41,6 +48,15 @@ const App: React.FC = () => {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
+
+        // Quick health check to provide more actionable errors when API is misconfigured
+        try {
+          const healthResp = await fetch(`${API_BASE_URL}/api/health`);
+          await parseJSONSafely(healthResp);
+        } catch (e: any) {
+          throw new Error(`Backend health check failed: ${e.message}. Verify backend is running and VITE_API_BASE_URL is set correctly.`);
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/initial-data`);
         const responseData = await parseJSONSafely(response);
         
