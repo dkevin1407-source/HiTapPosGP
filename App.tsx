@@ -5,8 +5,8 @@ import AdminDashboard from './components/AdminDashboard';
 import WaiterApp from './components/WaiterApp';
 import CustomerPortal from './components/CustomerPortal';
 
-// API base URL - empty string means same domain (relative URLs)
-const API_BASE_URL = '';
+// API base URL - can be set via VITE_API_BASE_URL; empty string means same domain (relative URLs)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 const App: React.FC = () => {
   const [activeRole, setActiveRole] = useState<Role | 'Customer'>(Role.Admin);
@@ -23,13 +23,26 @@ const App: React.FC = () => {
     audio.play().catch(() => {});
   };
 
+  const parseJSONSafely = async (response: Response) => {
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    if (contentType.includes('application/json')) {
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON received from ${response.url}: ${text.slice(0,200)}`);
+      }
+    }
+    throw new Error(`Expected JSON but received: ${text.slice(0,200)}`);
+  };
+
   // Fetch initial data from API
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
         const response = await fetch(`${API_BASE_URL}/api/initial-data`);
-        const responseData = await response.json();
+        const responseData = await parseJSONSafely(response);
         
         if (!response.ok) {
           // Response contains error details
@@ -99,19 +112,19 @@ const App: React.FC = () => {
       
       if (!response.ok) throw new Error('Failed to create order');
       
-      const { orderId } = await response.json();
+      const { orderId } = await parseJSONSafely(response);
       const createdOrder = { ...newOrder, id: orderId };
       
       setOrders(prev => [...prev, createdOrder]);
       
       // Refresh menu to get updated inventory
       const menuResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const menuData = await menuResponse.json();
+      const menuData = await parseJSONSafely(menuResponse);
       setMenu(menuData.menu || []);
       
       // Refresh tables
       const tablesResponse = await fetch(`${API_BASE_URL}/api/tables`);
-      const tablesData = await tablesResponse.json();
+      const tablesData = await parseJSONSafely(tablesResponse);
       setTables(tablesData || []);
       
       setNotification("Order Placed Successfully!");
@@ -133,7 +146,7 @@ const App: React.FC = () => {
       
       // Refresh service requests and tables
       const dataResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const data = await dataResponse.json();
+      const data = await parseJSONSafely(dataResponse);
       setServiceRequests((data.serviceRequests || []).map((sr: any) => ({
         ...sr,
         timestamp: new Date(sr.timestamp)
@@ -168,7 +181,7 @@ const App: React.FC = () => {
       
       // Refresh data
       const dataResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const data = await dataResponse.json();
+      const data = await parseJSONSafely(dataResponse);
       setOrders((data.orders || []).map((o: any) => ({
         ...o,
         createdAt: new Date(o.createdAt)
@@ -199,7 +212,7 @@ const App: React.FC = () => {
       
       // Refresh menu
       const menuResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const menuData = await menuResponse.json();
+      const menuData = await parseJSONSafely(menuResponse);
       setMenu(menuData.menu || []);
       
       setNotification(`Item '${updatedItem.name}' updated.`);
@@ -225,13 +238,14 @@ const App: React.FC = () => {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        let errorData = { error: 'Unknown error' };
+        try { errorData = await parseJSONSafely(response); } catch(e) { /* keep fallback */ }
         throw new Error(errorData.error || errorData.details || 'Failed to add menu item');
       }
       
       // Refresh menu
       const menuResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const menuData = await menuResponse.json();
+      const menuData = await parseJSONSafely(menuResponse);
       setMenu(menuData.menu || []);
       
       setNotification(`New item '${item.name}' added.`);
@@ -251,7 +265,7 @@ const App: React.FC = () => {
       
       // Refresh data
       const dataResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const data = await dataResponse.json();
+      const data = await parseJSONSafely(dataResponse);
       setOrders((data.orders || []).map((o: any) => ({
         ...o,
         createdAt: new Date(o.createdAt)
@@ -276,7 +290,7 @@ const App: React.FC = () => {
       
       // Refresh data
       const dataResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-      const data = await dataResponse.json();
+      const data = await parseJSONSafely(dataResponse);
       setOrders((data.orders || []).map((o: any) => ({
         ...o,
         createdAt: new Date(o.createdAt)
@@ -330,7 +344,7 @@ const App: React.FC = () => {
                 
                 // Refresh service requests
                 const dataResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-                const data = await dataResponse.json();
+                const data = await parseJSONSafely(dataResponse);
                 setServiceRequests((data.serviceRequests || []).map((sr: any) => ({
                   ...sr,
                   timestamp: new Date(sr.timestamp)
@@ -351,7 +365,7 @@ const App: React.FC = () => {
                 if (!response.ok) throw new Error('Failed to delete menu item');
                 
                 const menuResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
-                const menuData = await menuResponse.json();
+                const menuData = await parseJSONSafely(menuResponse);
                 setMenu(menuData.menu || []);
               } catch (error) {
                 console.error('Failed to delete menu item:', error);
@@ -366,12 +380,13 @@ const App: React.FC = () => {
                   body: JSON.stringify({ name: cat.name, color: cat.color })
                 });
                 if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                  let errorData = { error: 'Unknown error' };
+                  try { errorData = await parseJSONSafely(response); } catch(e) { /* keep fallback */ }
                   throw new Error(errorData.error || errorData.details || 'Failed to add category');
                 }
                 
                 const catResponse = await fetch(`${API_BASE_URL}/api/categories`);
-                const catData = await catResponse.json();
+                const catData = await parseJSONSafely(catResponse);
                 setCategories(catData || []);
                 setNotification(`Category '${cat.name}' added successfully.`);
               } catch (error: any) {
@@ -392,12 +407,13 @@ const App: React.FC = () => {
                   })
                 });
                 if (!response.ok) {
-                  const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                  let errorData = { error: 'Unknown error' };
+                  try { errorData = await parseJSONSafely(response); } catch(e) { /* keep fallback */ }
                   throw new Error(errorData.error || errorData.details || 'Failed to add table');
                 }
                 
                 const tablesResponse = await fetch(`${API_BASE_URL}/api/tables`);
-                const tablesData = await tablesResponse.json();
+                const tablesData = await parseJSONSafely(tablesResponse);
                 setTables(tablesData || []);
                 setNotification(`Table '${table.number}' added successfully.`);
               } catch (error: any) {
@@ -413,7 +429,7 @@ const App: React.FC = () => {
                 if (!response.ok) throw new Error('Failed to delete table');
                 
                 const tablesResponse = await fetch(`${API_BASE_URL}/api/tables`);
-                const tablesData = await tablesResponse.json();
+                const tablesData = await parseJSONSafely(tablesResponse);
                 setTables(tablesData || []);
               } catch (error) {
                 console.error('Failed to delete table:', error);
@@ -430,7 +446,7 @@ const App: React.FC = () => {
                 if (!response.ok) throw new Error('Failed to update area');
                 
                 const tablesResponse = await fetch(`${API_BASE_URL}/api/tables`);
-                const tablesData = await tablesResponse.json();
+                const tablesData = await parseJSONSafely(tablesResponse);
                 setTables(tablesData || []);
               } catch (error) {
                 console.error('Failed to update area:', error);
@@ -445,7 +461,7 @@ const App: React.FC = () => {
                 if (!response.ok) throw new Error('Failed to delete area');
                 
                 const tablesResponse = await fetch(`${API_BASE_URL}/api/tables`);
-                const tablesData = await tablesResponse.json();
+                const tablesData = await parseJSONSafely(tablesResponse);
                 setTables(tablesData || []);
               } catch (error) {
                 console.error('Failed to delete area:', error);
