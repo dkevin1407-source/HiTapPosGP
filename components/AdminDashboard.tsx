@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Table, MenuItem, ServiceRequest, Order, TableStatus, OrderStatus, Category, VegType, OrderItem } from '../types';
 import BillingModule from './BillingModule';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, AreaChart, Area } from 'recharts';
@@ -58,6 +58,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newItem, setNewItem] = useState({ name: '', price: 0, categoryId: 0, vegType: VegType.Veg, shortcut: '', inventoryCount: 50 });
   const [newCategory, setNewCategory] = useState({ name: '', color: '#3b82f6' });
   const [newTable, setNewTable] = useState({ number: '', area: '', isNewArea: false, customArea: '' });
+
+  // Update categoryId when categories load
+  React.useEffect(() => {
+    if (categories.length > 0 && newItem.categoryId === 0) {
+      setNewItem(prev => ({ ...prev, categoryId: categories[0].id }));
+    }
+  }, [categories]);
 
   const areas = useMemo(() => Array.from(new Set(tables.map(t => t.area))), [tables]);
 
@@ -162,11 +169,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setQuickSellSearch('');
   };
 
-  const handleAddItemSubmit = (e: React.FormEvent) => {
+  const handleAddItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAddMenuItem({ ...newItem, id: Date.now(), isAvailable: true, categoryId: newItem.categoryId || categories[0]?.id || 1 });
+    if (!newItem.categoryId && categories.length > 0) {
+      setNewItem({ ...newItem, categoryId: categories[0].id });
+      return;
+    }
+    if (!newItem.categoryId) {
+      alert('Please select a category first');
+      return;
+    }
+    await onAddMenuItem({ ...newItem, id: Date.now(), isAvailable: true, categoryId: newItem.categoryId });
     setIsAddingItem(false);
-    setNewItem({ name: '', price: 0, categoryId: 0, vegType: VegType.Veg, shortcut: '', inventoryCount: 50 });
+    setNewItem({ name: '', price: 0, categoryId: categories.length > 0 ? categories[0].id : 0, vegType: VegType.Veg, shortcut: '', inventoryCount: 50 });
   };
 
   const handleEditItemSubmit = (e: React.FormEvent) => {
@@ -178,21 +193,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleAddCategorySubmit = (e: React.FormEvent) => {
+  const handleAddCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAddCategory({ id: Date.now(), ...newCategory });
+    if (!newCategory.name.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+    await onAddCategory({ id: Date.now(), ...newCategory });
     setIsAddingCategory(false);
     setNewCategory({ name: '', color: '#3b82f6' });
   };
 
-  const handleAddTableSubmit = (e: React.FormEvent) => {
+  const handleAddTableSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const area = newTable.isNewArea ? newTable.customArea : newTable.area;
-    if (!area) return;
-    onAddTable({
+    if (!area || !area.trim()) {
+      alert('Please select or create an area');
+      return;
+    }
+    if (!newTable.number || !newTable.number.trim()) {
+      alert('Please enter a table number');
+      return;
+    }
+    await onAddTable({
       id: Date.now(),
-      number: newTable.number,
-      area: area,
+      number: newTable.number.trim(),
+      area: area.trim(),
       status: TableStatus.Available,
       token: `token-${Date.now()}`
     });
@@ -645,7 +671,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <form onSubmit={handleAddTableSubmit} className="space-y-6">
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Table Number</label>
-            <input required type="text" className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" placeholder="e.g. G5" value={newTable.number} onChange={e => setNewTable({...newTable, number: e.target.value})} />
+            <input 
+              required 
+              type="text" 
+              className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" 
+              placeholder="e.g. G5" 
+              value={newTable.number} 
+              onChange={(e) => {
+                const value = e.target.value;
+                setNewTable(prev => ({...prev, number: value}));
+              }} 
+            />
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Assign to Floor/Area</label>
@@ -664,7 +700,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label htmlFor="newAreaCheck" className="text-xs font-bold text-slate-600">Create new area instead</label>
               </div>
               {newTable.isNewArea && (
-                <input required type="text" className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold animate-in slide-in-from-top-2" placeholder="Floor Name (e.g. Terrace)" value={newTable.customArea} onChange={e => setNewTable({...newTable, customArea: e.target.value})} />
+                <input 
+                  required 
+                  type="text" 
+                  className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold animate-in slide-in-from-top-2" 
+                  placeholder="Floor Name (e.g. Terrace)" 
+                  value={newTable.customArea} 
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setNewTable(prev => ({...prev, customArea: value}));
+                  }} 
+                />
               )}
             </div>
           </div>
@@ -687,20 +733,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Item Name</label>
-              <input required type="text" className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+              <input 
+                required 
+                type="text" 
+                className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" 
+                value={newItem.name} 
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setNewItem(prev => ({...prev, name: value}));
+                }} 
+              />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Price (₹)</label>
-              <input required type="number" className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" value={newItem.price} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
+              <input 
+                required 
+                type="number" 
+                className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" 
+                value={newItem.price} 
+                onChange={(e) => {
+                  const value = Number(e.target.value) || 0;
+                  setNewItem(prev => ({...prev, price: value}));
+                }} 
+              />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Code/Shortcut</label>
-              <input type="text" className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold uppercase" value={newItem.shortcut} onChange={e => setNewItem({...newItem, shortcut: e.target.value})} />
+              <input 
+                type="text" 
+                className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold uppercase" 
+                value={newItem.shortcut} 
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setNewItem(prev => ({...prev, shortcut: value}));
+                }} 
+              />
             </div>
             <div className="col-span-2">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Category</label>
-              <select className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" value={newItem.categoryId} onChange={e => setNewItem({...newItem, categoryId: Number(e.target.value)})}>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <select 
+                required
+                className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" 
+                value={newItem.categoryId || (categories.length > 0 ? categories[0].id : '')} 
+                onChange={e => setNewItem({...newItem, categoryId: Number(e.target.value)})}
+              >
+                {categories.length === 0 ? (
+                  <option value="">No categories available</option>
+                ) : (
+                  categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                )}
               </select>
             </div>
             <div className="col-span-2">
@@ -742,7 +823,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <form onSubmit={handleAddCategorySubmit} className="space-y-6">
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Category Name</label>
-            <input required type="text" className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" placeholder="e.g. Main Course" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} />
+            <input 
+              required 
+              type="text" 
+              className="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold" 
+              placeholder="e.g. Main Course" 
+              value={newCategory.name} 
+              onChange={(e) => {
+                const value = e.target.value;
+                setNewCategory(prev => ({...prev, name: value}));
+              }} 
+            />
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Brand Color</label>

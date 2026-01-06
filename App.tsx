@@ -201,7 +201,10 @@ const App: React.FC = () => {
         })
       });
       
-      if (!response.ok) throw new Error('Failed to add menu item');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || errorData.details || 'Failed to add menu item');
+      }
       
       // Refresh menu
       const menuResponse = await fetch(`${API_BASE_URL}/api/initial-data`);
@@ -209,9 +212,9 @@ const App: React.FC = () => {
       setMenu(menuData.menu || []);
       
       setNotification(`New item '${item.name}' added.`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add menu item:', error);
-      setNotification('Failed to add item. Please try again.');
+      setNotification(`Failed to add item: ${error.message || 'Please try again.'}`);
     }
   };
 
@@ -339,14 +342,18 @@ const App: React.FC = () => {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ name: cat.name, color: cat.color })
                 });
-                if (!response.ok) throw new Error('Failed to add category');
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                  throw new Error(errorData.error || errorData.details || 'Failed to add category');
+                }
                 
                 const catResponse = await fetch(`${API_BASE_URL}/api/categories`);
                 const catData = await catResponse.json();
                 setCategories(catData || []);
-              } catch (error) {
+                setNotification(`Category '${cat.name}' added successfully.`);
+              } catch (error: any) {
                 console.error('Failed to add category:', error);
-                setNotification('Failed to add category. Please try again.');
+                setNotification(`Failed to add category: ${error.message || 'Please try again.'}`);
               }
             }}
             onAddTable={async (table) => {
@@ -361,14 +368,18 @@ const App: React.FC = () => {
                     token: table.token
                   })
                 });
-                if (!response.ok) throw new Error('Failed to add table');
+                if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                  throw new Error(errorData.error || errorData.details || 'Failed to add table');
+                }
                 
                 const tablesResponse = await fetch(`${API_BASE_URL}/api/tables`);
                 const tablesData = await tablesResponse.json();
                 setTables(tablesData || []);
-              } catch (error) {
+                setNotification(`Table '${table.number}' added successfully.`);
+              } catch (error: any) {
                 console.error('Failed to add table:', error);
-                setNotification('Failed to add table. Please try again.');
+                setNotification(`Failed to add table: ${error.message || 'Please try again.'}`);
               }
             }}
             onDeleteTable={async (id) => {
