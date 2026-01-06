@@ -1,0 +1,7 @@
+{
+  "name": "Petpooja Clone POS",
+  "description": "A high-performance Restaurant POS system featuring Admin Dashboard, Waiter Console, and Customer NFC Hub with real-time order tracking and billing management.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
