@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Table, MenuItem, Order, OrderItem, TableStatus, OrderStatus, VegType, Category } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// API base URL - empty string means same domain (relative URLs)
+const API_BASE_URL = '';
 
 interface WaiterAppProps {
   tables: Table[];
