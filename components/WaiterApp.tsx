@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Table, MenuItem, Order, OrderItem, TableStatus, OrderStatus, VegType, Category } from '../types';
 
-// API base URL - empty string means same domain (relative URLs)
-const API_BASE_URL = '';
+// API base URL - can be set via VITE_API_BASE_URL; empty string means same domain (relative URLs)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 interface WaiterAppProps {
   tables: Table[];
@@ -11,7 +11,7 @@ interface WaiterAppProps {
   onCreateOrder: (order: Order) => void;
 }
 
-const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) => {
+const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }: WaiterAppProps) => {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
@@ -19,11 +19,20 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
   const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
 
+  const parseJSONSafely = async (response: Response) => {
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    if (contentType.includes('application/json')) {
+      try { return JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON received from ${response.url}: ${text.slice(0,200)}`); }
+    }
+    throw new Error(`Expected JSON but received: ${text.slice(0,200)}`);
+  };
+
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/categories`);
-        const data = await response.json();
+        const data = await parseJSONSafely(response);
         setCategories(data || []);
       } catch (error) {
         console.error('Failed to fetch categories:', error);
@@ -32,7 +41,7 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
     fetchCategories();
   }, []);
 
-  const filteredMenu = menu.filter(item => 
+  const filteredMenu = menu.filter((item: MenuItem) => 
     (!activeCategory || item.categoryId === activeCategory) &&
     (item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
      item.shortcut?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -44,15 +53,15 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
       return;
     }
 
-    setCart(prev => {
-      const existing = prev.find(i => i.menuItemId === item.id);
+    setCart((prev: OrderItem[]) => {
+      const existing = prev.find((i: OrderItem) => i.menuItemId === item.id);
       if (existing) {
         // Double check against current inventory vs what's already in cart
         if (existing.quantity >= item.inventoryCount) {
           alert(`⚠️ MAX STOCK REACHED: Only ${item.inventoryCount} units of ${item.name} available.`);
           return prev;
         }
-        return prev.map(i => i.menuItemId === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map((i: OrderItem) => i.menuItemId === item.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
       return [...prev, {
         id: Date.now(),
@@ -65,7 +74,7 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
   };
 
   const removeFromCart = (id: number) => {
-    setCart(prev => prev.filter(i => i.id !== id));
+    setCart((prev: OrderItem[]) => prev.filter((i: OrderItem) => i.id !== id));
   };
 
   const handleKOT = () => {
@@ -76,7 +85,7 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
       tableId: selectedTable.id,
       status: OrderStatus.Kitchen,
       items: [...cart],
-      totalAmount: cart.reduce((acc, i) => acc + (i.price * i.quantity), 0),
+      totalAmount: cart.reduce((acc: number, i: OrderItem) => acc + (i.price * i.quantity), 0),
       discount: 0,
       createdAt: new Date()
     };
@@ -90,7 +99,7 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
     const printEl = document.getElementById('print-section');
     if (!printEl) return;
     
-    const tableNum = tables.find(t => t.id === order.tableId)?.number || '?';
+    const tableNum = tables.find((t: Table) => t.id === order.tableId)?.number || '?';
     
     printEl.innerHTML = `
       <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
@@ -168,7 +177,7 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
             </div>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-          {tables.map(table => (
+          {tables.map((table: Table) => (
             <button
               key={table.id}
               onClick={() => setSelectedTable(table)}
