@@ -67,25 +67,29 @@ app.get('/api/initial-data', async (req, res) => {
         console.error('Error fetching initial data:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
         
         // Check if it's a table doesn't exist error
         if (error.code === 'ER_NO_SUCH_TABLE') {
             res.status(500).json({ 
                 error: 'Database tables not found', 
                 details: 'Please run the schema.sql file to create the required tables.',
-                message: error.message 
+                message: error.message,
+                code: error.code
             });
-        } else if (error.code === 'ECONNREFUSED' || error.code === 'ER_ACCESS_DENIED_ERROR') {
+        } else if (error.code === 'ECONNREFUSED' || error.code === 'ER_ACCESS_DENIED_ERROR' || error.code === 'ER_BAD_DB_ERROR') {
             res.status(500).json({ 
                 error: 'Database connection failed', 
-                details: 'Unable to connect to the database. Please check your database credentials.',
-                message: error.message 
+                details: `Unable to connect to the database. Error: ${error.message}. Please check your database credentials in db.js`,
+                message: error.message,
+                code: error.code
             });
         } else {
             res.status(500).json({ 
                 error: 'Database fetch failed', 
-                details: error.message,
-                code: error.code 
+                details: error.message || 'Unknown database error',
+                message: error.message || 'Unknown error',
+                code: error.code || 'UNKNOWN'
             });
         }
     }
