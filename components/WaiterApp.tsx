@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { Table, MenuItem, Order, OrderItem, TableStatus, OrderStatus, VegType } from '../types';
-import { MOCK_CATEGORIES } from '../mockData';
+import React, { useState, useEffect } from 'react';
+import { Table, MenuItem, Order, OrderItem, TableStatus, OrderStatus, VegType, Category } from '../types';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 interface WaiterAppProps {
   tables: Table[];
@@ -15,6 +16,20 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [orderSuccess, setOrderSuccess] = useState<Order | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/categories`);
+        const data = await response.json();
+        setCategories(data || []);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const filteredMenu = menu.filter(item => 
     (!activeCategory || item.categoryId === activeCategory) &&
@@ -202,7 +217,7 @@ const WaiterApp: React.FC<WaiterAppProps> = ({ tables, menu, onCreateOrder }) =>
               >
                 ALL
               </button>
-              {MOCK_CATEGORIES.map(cat => (
+              {categories.map(cat => (
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
