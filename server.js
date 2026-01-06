@@ -69,6 +69,16 @@ app.put('/api/menu/:id', async (req, res) => {
     }
 });
 
+app.delete('/api/menu/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM menu_items WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Delete failed' });
+    }
+});
+
 // Order Management
 app.post('/api/orders', async (req, res) => {
     const { tableId, items, totalAmount } = req.body;
@@ -116,21 +126,48 @@ app.post('/api/orders', async (req, res) => {
 
 app.put('/api/orders/:id/settle', async (req, res) => {
     const { id } = req.params;
-    const { tableId, totalAmount, gstAmount, serviceTaxAmount, paymentMethod, discount } = req.body;
+    const { tableId, totalAmount, gstAmount, serviceTaxAmount, paymentMethod, discount, settleAllTableOrders } = req.body;
+    const connection = await pool.getConnection();
     try {
-        await pool.query(
+        await connection.beginTransaction();
+        
+        // Settle the primary order
+        await connection.query(
             'UPDATE orders SET status = "Paid", totalAmount = ?, gstAmount = ?, serviceTaxAmount = ?, paymentMethod = ?, discount = ? WHERE id = ?',
             [totalAmount, gstAmount, serviceTaxAmount, paymentMethod, discount, id]
         );
-        if (tableId !== 0) {
-            await pool.query(
-                'UPDATE tables_pos SET status = "Available", currentOrderId = NULL WHERE id = ?',
-                [tableId]
+        
+        // If requested, mark all other unpaid orders for this table as paid
+        if (settleAllTableOrders && tableId !== 0) {
+            await connection.query(
+                'UPDATE orders SET status = "Paid", paymentMethod = ? WHERE tableId = ? AND status != "Paid" AND id != ?',
+                [paymentMethod, tableId, id]
             );
         }
+        
+        // Free table if all orders are paid
+        if (tableId !== 0) {
+            const [unpaidOrders] = await connection.query(
+                'SELECT COUNT(*) as count FROM orders WHERE tableId = ? AND status != "Paid"',
+                [tableId]
+            );
+            
+            if (unpaidOrders[0].count === 0) {
+                await connection.query(
+                    'UPDATE tables_pos SET status = "Available", currentOrderId = NULL WHERE id = ?',
+                    [tableId]
+                );
+            }
+        }
+        
+        await connection.commit();
         res.json({ success: true });
     } catch (error) {
+        await connection.rollback();
+        console.error(error);
         res.status(500).json({ error: 'Settlement failed' });
+    } finally {
+        connection.release();
     }
 });
 
@@ -157,6 +194,251 @@ app.delete('/api/service-requests/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Resolution failed' });
+    }
+});
+
+// Categories Management
+app.get('/api/categories', async (req, res) => {
+    try {
+        const [categories] = await pool.query('SELECT * FROM categories ORDER BY id');
+        res.json(categories);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+});
+
+app.post('/api/categories', async (req, res) => {
+    const { name, color } = req.body;
+    try {
+        const [result] = await pool.query(
+            'INSERT INTO categories (name, color) VALUES (?, ?)',
+            [name, color]
+        );
+        res.json({ id: result.insertId, name, color });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add category' });
+    }
+});
+
+// Tables Management
+app.get('/api/tables', async (req, res) => {
+    try {
+        const [tables] = await pool.query('SELECT * FROM tables_pos ORDER BY area, number');
+        res.json(tables);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch tables' });
+    }
+});
+
+app.post('/api/tables', async (req, res) => {
+    const { number, area, status, token } = req.body;
+    try {
+        const [result] = await pool.query(
+            'INSERT INTO tables_pos (number, area, status, token) VALUES (?, ?, ?, ?)',
+            [number, area, status || 'Available', token || `token-${Date.now()}`]
+        );
+        res.json({ id: result.insertId, number, area, status: status || 'Available', token: token || `token-${Date.now()}` });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add table' });
+    }
+});
+
+app.put('/api/tables/:id', async (req, res) => {
+    const { id } = req.params;
+    const { area, status, currentOrderId } = req.body;
+    try {
+        const updates = [];
+        const values = [];
+        if (area !== undefined) {
+            updates.push('area = ?');
+            values.push(area);
+        }
+        if (status !== undefined) {
+            updates.push('status = ?');
+            values.push(status);
+        }
+        if (currentOrderId !== undefined) {
+            updates.push('currentOrderId = ?');
+            values.push(currentOrderId);
+        }
+        if (updates.length > 0) {
+            values.push(id);
+            await pool.query(
+                `UPDATE tables_pos SET ${updates.join(', ')} WHERE id = ?`,
+                values
+            );
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Update failed' });
+    }
+});
+
+app.put('/api/tables/area/update', async (req, res) => {
+    const { oldArea, newArea } = req.body;
+    try {
+        await pool.query(
+            'UPDATE tables_pos SET area = ? WHERE area = ?',
+            [newArea, oldArea]
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Area update failed' });
+    }
+});
+
+app.delete('/api/tables/area/:area', async (req, res) => {
+    const { area } = req.params;
+    try {
+        await pool.query('DELETE FROM tables_pos WHERE area = ?', [area]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Area deletion failed' });
+    }
+});
+
+app.delete('/api/tables/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM tables_pos WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Delete failed' });
+    }
+});
+
+// Order Cancellation
+app.delete('/api/orders/:id/item/:itemId', async (req, res) => {
+    const { id, itemId } = req.params;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        
+        // Get item details
+        const [items] = await connection.query(
+            'SELECT * FROM order_items WHERE id = ? AND orderId = ?',
+            [itemId, id]
+        );
+        
+        if (items.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Item not found' });
+        }
+        
+        const item = items[0];
+        
+        // Return inventory
+        await connection.query(
+            'UPDATE menu_items SET inventoryCount = inventoryCount + ? WHERE id = ?',
+            [item.quantity, item.menuItemId]
+        );
+        
+        // Delete item
+        await connection.query('DELETE FROM order_items WHERE id = ?', [itemId]);
+        
+        // Check if order has remaining items
+        const [remainingItems] = await connection.query(
+            'SELECT COUNT(*) as count FROM order_items WHERE orderId = ?',
+            [id]
+        );
+        
+        if (remainingItems[0].count === 0) {
+            // Cancel entire order
+            await connection.query('DELETE FROM orders WHERE id = ?', [id]);
+            await connection.query(
+                'UPDATE tables_pos SET status = "Available", currentOrderId = NULL WHERE currentOrderId = ?',
+                [id]
+            );
+        } else {
+            // Update order total
+            const [orderItems] = await connection.query(
+                'SELECT SUM(price * quantity) as total FROM order_items WHERE orderId = ?',
+                [id]
+            );
+            await connection.query(
+                'UPDATE orders SET totalAmount = ? WHERE id = ?',
+                [orderItems[0].total || 0, id]
+            );
+        }
+        
+        await connection.commit();
+        res.json({ success: true });
+    } catch (error) {
+        await connection.rollback();
+        console.error(error);
+        res.status(500).json({ error: 'Cancellation failed' });
+    } finally {
+        connection.release();
+    }
+});
+
+app.delete('/api/orders/:id', async (req, res) => {
+    const { id } = req.params;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        
+        // Get order details
+        const [orders] = await connection.query('SELECT * FROM orders WHERE id = ?', [id]);
+        if (orders.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        
+        const order = orders[0];
+        
+        // Get order items and return inventory
+        const [items] = await connection.query(
+            'SELECT * FROM order_items WHERE orderId = ?',
+            [id]
+        );
+        
+        for (const item of items) {
+            await connection.query(
+                'UPDATE menu_items SET inventoryCount = inventoryCount + ? WHERE id = ?',
+                [item.quantity, item.menuItemId]
+            );
+        }
+        
+        // Free table if needed
+        if (order.tableId !== 0) {
+            const [tableOrders] = await connection.query(
+                'SELECT COUNT(*) as count FROM orders WHERE tableId = ? AND status != "Paid" AND id != ?',
+                [order.tableId, id]
+            );
+            
+            if (tableOrders[0].count === 0) {
+                await connection.query(
+                    'UPDATE tables_pos SET status = "Available", currentOrderId = NULL WHERE id = ?',
+                    [order.tableId]
+                );
+            } else {
+                // Set currentOrderId to the next newest order
+                const [nextOrder] = await connection.query(
+                    'SELECT id FROM orders WHERE tableId = ? AND status != "Paid" AND id != ? ORDER BY id DESC LIMIT 1',
+                    [order.tableId, id]
+                );
+                if (nextOrder.length > 0) {
+                    await connection.query(
+                        'UPDATE tables_pos SET currentOrderId = ? WHERE id = ?',
+                        [nextOrder[0].id, order.tableId]
+                    );
+                }
+            }
+        }
+        
+        // Delete order and items
+        await connection.query('DELETE FROM order_items WHERE orderId = ?', [id]);
+        await connection.query('DELETE FROM orders WHERE id = ?', [id]);
+        
+        await connection.commit();
+        res.json({ success: true });
+    } catch (error) {
+        await connection.rollback();
+        console.error(error);
+        res.status(500).json({ error: 'Order cancellation failed' });
+    } finally {
+        connection.release();
     }
 });
 

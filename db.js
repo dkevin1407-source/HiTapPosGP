@@ -2,13 +2,14 @@
 import mysql from 'mysql2/promise';
 
 const dbConfig = {
-    host: 'localhost', // Usually localhost on Hostinger for same-server DB
+    host: 'localhost', // Hostinger uses localhost for same-server databases
     user: 'u552823944_PosNodeJs',
     password: 'dctXbb5@1407',
     database: 'u552823944_POSNodeJs',
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    timezone: '+00:00' // UTC timezone
 };
 
 export const pool = mysql.createPool(dbConfig);
