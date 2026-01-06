@@ -3,9 +3,9 @@ import mysql from 'mysql2/promise';
 
 const dbConfig = {
     host: 'localhost', // Hostinger uses localhost for same-server databases
-    user: 'u552823944_PosNodeJs',
+    user: 'u552823944_u552823944_POS',
     password: 'dctXbb5@1407',
-    database: 'u552823944_POSNodeJs',
+    database: 'u552823944_u552823944_POS',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
