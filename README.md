@@ -23,6 +23,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1R9Shmqf-Xsk7oOE35mggD3
 
 Notes:
 - Vite is configured to proxy `/api` to `http://localhost:3000` during development. If you prefer to use an explicit base URL set `VITE_API_BASE_URL=http://localhost:3000` in an `.env` file.
+- To run both backend and frontend together in dev mode:
+  - `npm run dev:all` (starts backend with `nodemon` and frontend with `vite` using `concurrently`)
 - For production: `npm run build` then `npm run start` (the `server.js` serves the built `dist` folder)
 
 See `TROUBLESHOOTING.md` for Hostinger deployment checks and database setup.
