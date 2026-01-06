@@ -9,10 +9,23 @@ const dbConfig = {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    timezone: '+00:00' // UTC timezone
+    timezone: '+00:00', // UTC timezone
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
 };
 
 export const pool = mysql.createPool(dbConfig);
+
+// Test connection on startup
+pool.getConnection()
+    .then(connection => {
+        console.log('✅ Database connected successfully');
+        connection.release();
+    })
+    .catch(error => {
+        console.error('❌ Database connection failed:', error.message);
+        console.error('Error code:', error.code);
+    });
 
 export async function query(sql, params) {
     try {

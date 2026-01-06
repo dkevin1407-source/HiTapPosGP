@@ -29,6 +29,12 @@ const App: React.FC = () => {
       try {
         setIsLoading(true);
         const response = await fetch(`${API_BASE_URL}/api/initial-data`);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.details || errorData.error || 'Failed to fetch data');
+        }
+        
         const data = await response.json();
         
         // Transform data to match frontend types
@@ -43,9 +49,15 @@ const App: React.FC = () => {
           ...req,
           timestamp: new Date(req.timestamp)
         })));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch initial data:', error);
-        setNotification('Failed to load data. Please refresh the page.');
+        const errorMessage = error.message || 'Failed to load data. Please refresh the page.';
+        setNotification(`⚠️ ${errorMessage}`);
+        
+        // If it's a database error, show more helpful message
+        if (errorMessage.includes('tables not found') || errorMessage.includes('connection failed')) {
+          console.error('Database Error Details:', error);
+        }
       } finally {
         setIsLoading(false);
       }

@@ -19,25 +19,75 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- API ROUTES ---
 
+// Database connection test
+app.get('/api/test-db', async (req, res) => {
+    try {
+        const [result] = await pool.query('SELECT 1 as test');
+        res.json({ 
+            status: 'connected', 
+            message: 'Database connection successful',
+            test: result 
+        });
+    } catch (error) {
+        console.error('Database connection error:', error);
+        res.status(500).json({ 
+            error: 'Database connection failed', 
+            details: error.message,
+            code: error.code 
+        });
+    }
+});
+
 // Initial Hydration
 app.get('/api/initial-data', async (req, res) => {
     try {
-        const [categories] = await pool.query('SELECT * FROM categories');
-        const [menu] = await pool.query('SELECT * FROM menu_items');
-        const [tables] = await pool.query('SELECT * FROM tables_pos');
-        const [orders] = await pool.query('SELECT * FROM orders WHERE status != "Paid"');
-        const [serviceRequests] = await pool.query('SELECT * FROM service_requests WHERE status = "Active"');
+        // Test connection first
+        await pool.query('SELECT 1');
+        
+        const [categories] = await pool.query('SELECT * FROM categories ORDER BY id');
+        const [menu] = await pool.query('SELECT * FROM menu_items ORDER BY id');
+        const [tables] = await pool.query('SELECT * FROM tables_pos ORDER BY id');
+        const [orders] = await pool.query('SELECT * FROM orders WHERE status != "Paid" ORDER BY id');
+        const [serviceRequests] = await pool.query('SELECT * FROM service_requests WHERE status = "Active" ORDER BY id');
         
         // Fetch items for active orders
         for(let order of orders) {
-            const [items] = await pool.query('SELECT * FROM order_items WHERE orderId = ?', [order.id]);
+            const [items] = await pool.query('SELECT * FROM order_items WHERE orderId = ? ORDER BY id', [order.id]);
             order.items = items;
         }
 
-        res.json({ categories, menu, tables, orders, serviceRequests });
+        res.json({ 
+            categories: categories || [], 
+            menu: menu || [], 
+            tables: tables || [], 
+            orders: orders || [], 
+            serviceRequests: serviceRequests || [] 
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Database fetch failed' });
+        console.error('Error fetching initial data:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
+        // Check if it's a table doesn't exist error
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+            res.status(500).json({ 
+                error: 'Database tables not found', 
+                details: 'Please run the schema.sql file to create the required tables.',
+                message: error.message 
+            });
+        } else if (error.code === 'ECONNREFUSED' || error.code === 'ER_ACCESS_DENIED_ERROR') {
+            res.status(500).json({ 
+                error: 'Database connection failed', 
+                details: 'Unable to connect to the database. Please check your database credentials.',
+                message: error.message 
+            });
+        } else {
+            res.status(500).json({ 
+                error: 'Database fetch failed', 
+                details: error.message,
+                code: error.code 
+            });
+        }
     }
 });
 
@@ -463,7 +513,46 @@ app.delete('/api/orders/:id', async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK' });
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Database setup check endpoint
+app.get('/api/check-setup', async (req, res) => {
+    try {
+        const tables = ['categories', 'menu_items', 'tables_pos', 'orders', 'order_items', 'service_requests'];
+        const results = {};
+        
+        for (const table of tables) {
+            try {
+                const [rows] = await pool.query(`SELECT COUNT(*) as count FROM ${table}`);
+                results[table] = { exists: true, count: rows[0].count };
+            } catch (error) {
+                if (error.code === 'ER_NO_SUCH_TABLE') {
+                    results[table] = { exists: false, error: 'Table does not exist' };
+                } else {
+                    results[table] = { exists: false, error: error.message };
+                }
+            }
+        }
+        
+        const allExist = Object.values(results).every((r) => r.exists);
+        
+        res.json({
+            database: 'connected',
+            tables: results,
+            setupComplete: allExist,
+            message: allExist 
+                ? 'All tables exist. Setup is complete!' 
+                : 'Some tables are missing. Please run schema.sql to create them.'
+        });
+    } catch (error) {
+        res.status(500).json({
+            database: 'connection failed',
+            error: error.message,
+            code: error.code,
+            message: 'Unable to connect to database. Please check your database credentials.'
+        });
+    }
 });
 
 // All other routes serve frontend
