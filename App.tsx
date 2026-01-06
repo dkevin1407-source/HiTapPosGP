@@ -5,7 +5,8 @@ import AdminDashboard from './components/AdminDashboard';
 import WaiterApp from './components/WaiterApp';
 import CustomerPortal from './components/CustomerPortal';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// API base URL - empty string means same domain (relative URLs)
+const API_BASE_URL = '';
 
 const App: React.FC = () => {
   const [activeRole, setActiveRole] = useState<Role | 'Customer'>(Role.Admin);
